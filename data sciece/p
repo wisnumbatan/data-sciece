@@ -1,0 +1,166 @@
+import pandas as pd
+import seaborn as sns
+
+DATA_PATH = "data/"
+
+info_tourism = pd.read_csv(f"{DATA_PATH}/tourism_with_id.csv")
+tourism_rating = pd.read_csv(f"{DATA_PATH}/tourism_rating.csv")
+users = pd.read_csv(f"{DATA_PATH}/user.csv")
+
+tourism_rating.sample(5)
+
+users.sample(5)
+
+print(f"Number of places in the datasets : {len(info_tourism.Place_Id.unique())}")
+print(f"Number of users : {len(users.User_Id.unique())}")
+print(f"The number of ratings given by the user to the dataset : {len(tourism_rating.User_Id)}")
+
+info_tourism.info()
+
+info_tourism.isnull().sum()
+
+tourism_rating.info()
+
+tourism_rating.isnull().sum()
+
+users.info()
+
+users.isnull().sum()
+
+info_tourism.Category.unique()
+
+import numpy as np
+
+tourism_all = np.concatenate((
+    info_tourism.Place_Id.unique(),
+    tourism_rating.Place_Id.unique()
+))
+
+tourism_all = np.sort(np.unique(tourism_all))
+
+print(f"Total number of tourism: {len(tourism_all)}")
+
+all_tourism_rate = tourism_rating
+all_tourism_rate
+
+all_tourism = pd.merge(all_tourism_rate, info_tourism[["Place_Id","Place_Name","Description","City","Category"]], on='Place_Id', how='inner')
+all_tourism
+
+all_tourism['Description_category'] = all_tourism[['Category','Description']].agg(' '.join,axis=1)
+
+all_tourism
+
+all_tourism.isnull().sum()
+
+preparation= all_tourism.drop_duplicates("Place_Id")
+preparation
+
+place_id = preparation.Place_Id.tolist()
+
+place_name = preparation.Place_Name.tolist()
+
+place_category = preparation.Category.tolist()
+
+place_desc = preparation.Description.tolist()
+
+place_city = preparation.City.tolist()
+
+Description_category = preparation.Description_category.tolist()
+
+tourism_new = pd.DataFrame({
+    "id":place_id,
+    "name":place_name,
+    "category":place_category,
+    "description":place_desc,
+    "city":place_city,
+    "Description_category":Description_category
+})
+
+tourism_new
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+# Menghitung jumlah tempat wisata dengan rating terbanyak
+top_10 = tourism_new['id'].value_counts().reset_index()
+top_10.columns = ['Place_Id', 'rating_count']
+
+# Menggabungkan dengan data preparation berdasarkan Place_Id
+top_10 = pd.merge(top_10, preparation[['Place_Id', 'Place_Name']], how='left', on='Place_Id')
+
+# Periksa hasil penggabungan
+print(top_10.head())
+
+# Membuat visualisasi wisata dengan jumlah rating terbanyak
+if top_10.empty:
+    print("Data kosong setelah penggabungan. Periksa data input.")
+else:
+    plt.figure(figsize=(8, 5))
+    sns.barplot(x='rating_count', y='Place_Name', data=top_10, palette='viridis')
+    plt.title('Jumlah Tempat Wisata dengan Rating Terbanyak', pad=20)
+    plt.xlabel('Jumlah Rating')
+    plt.ylabel('Nama Lokasi')
+    plt.show()
+
+
+sns.countplot(y='Category', data=preparation)
+plt.title('Perbandingan Jumlah Kategori probolinggo', pad=20)
+plt.show()
+
+plt.figure(figsize=(5,3))
+sns.boxplot(users['Age']);
+plt.title('Distribusi Usia User', pad=20)
+plt.show()
+
+plt.figure(figsize=(7,3))
+sns.boxplot(info_tourism['Price'])
+plt.title('Distribusi Harga Masuk Wisata di Kota probolinggo', pad=20)
+plt.show()
+
+data = tourism_new
+data.sample(5)
+
+# Install scikit-learn
+%pip install scikit-learn
+
+from sklearn.feature_extraction.text import CountVectorizer
+
+cv = CountVectorizer()
+
+cv.fit(data['category'])
+
+print("Features Name: ", list(cv.vocabulary_.keys()))
+
+cv_matrix = cv.transform(data['Description_category']) 
+ 
+cv_matrix.shape 
+
+cv_matrix.todense()
+
+pd.DataFrame(
+    cv_matrix.todense(),
+    columns=list(cv.vocabulary_.keys()),
+    index = data.name
+).sample(5)
+
+from sklearn.metrics.pairwise import cosine_similarity
+
+cosine_sim = cosine_similarity(cv_matrix)
+cosine_sim
+
+cosine_sim_df = pd.DataFrame(cosine_sim,index=data['name'],columns=data['name'])
+cosine_sim_df.sample(5,axis=1).sample(10,axis=0)
+
+def tourism_recommendations(place_name,similarity_data=cosine_sim_df,items=data[['name','category','description','city']],k=5):
+    index = similarity_data.loc[:,place_name].to_numpy().argpartition(range(-1,-k,-1))
+    
+    closest = similarity_data.columns[index[-1:-(k+2):-1]]
+    
+    closest = closest.drop(place_name,errors='ignore')
+    
+    return pd.DataFrame(closest).merge(items).head(k)
+
+tourism_recommendations("Air Terjun Madakaripura")
+
+tourism_recommendations("Taman Wisata Study Lingkungan")
+
